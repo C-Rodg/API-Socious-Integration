@@ -1,0 +1,12 @@
+{
+  "name": "api-socious-integration",
+  "version": "1.0.0",
+  "description": "A Validar - Socious API integration.",
+  "main": "index.js",
+  "repository": {
+    "url": "https://github.com/C-Rodg/API-Socious-Integration.git",
+    "type": "git"
+  },
+  "author": "Curtis Rodgers",
+  "license": "MIT"
+}
