@@ -6,3 +6,9 @@ node_modules
 
 # Credentials
 credentials.js
+
+# Result File
+*.csv
+
+# VS Code
+.vscode
