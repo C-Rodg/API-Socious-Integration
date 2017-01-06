@@ -2,7 +2,9 @@ const credentials = require('./credentials');
 
 const validar = {
 	maxNumberToPush : 300,
-	timeBetweenPulls : 144000  // 300000 = 5 min, currently 2.4min
+	timeBetweenPulls : 144000  // 300000 = 5 min, currently 2.4min,
+	username : credentials.secrets.validarUser,
+	password : credentials.secrets.validarPassword
 };
 
 const socious = {
