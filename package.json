@@ -8,5 +8,11 @@
     "type": "git"
   },
   "author": "Curtis Rodgers",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "crypto-js": "^3.1.9-1",
+    "csv-parser": "^1.11.0",
+    "js2xmlparser": "^2.0.2",
+    "request": "^2.79.0"
+  }
 }
