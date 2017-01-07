@@ -18,6 +18,16 @@ const js2xmlOptions = {
     }
 };
 
+const validarAxiosHeader = {
+    headers : {
+        "Content-Type" : "text/xml; charset=utf-8",
+        "SOAPAction" : "https://portal.validar.com/PutRegistrationData",
+        "Accept" : "text/xml"
+    }
+};
+
+let firstPull = true;
+
 function getSociousURL() {
     const timeObject = new Date();
     const timestamp = Math.round(timeObject.getTime() / 1000);
@@ -26,8 +36,10 @@ function getSociousURL() {
     const signatureText = signatureBytes.toString();
 
     const url = `${settings.socious.baseURL}?action=${settings.socious.action}&eventid=${settings.socious.eventId}&timestamp=${timestamp}&apikey=${settings.socious.apiKey}&signature=${signatureText}`;
-    // TODO: ADD '&updates=1' after first request...
-
+    if(!firstPull){
+        url += '&updates=1';
+    }
+    console.log("1/7 : Got Socious URL");
     return url;
 }
 
@@ -36,10 +48,10 @@ function makeSociousRequest() {
         const sociousURL = getSociousURL();
         axios.get(sociousURL)
             .then((response) => {
-                console.log("Made Socious request");
+                console.log("2/7 : Made successful Socious request");
                 resolve(response);
             }).catch((err) => {
-                console.log(err);
+                console.log("Failed to make socious request", err);
                 reject(err);
             });
     });
@@ -49,9 +61,14 @@ function writeCSVtoFile(csvStream) {
     return new Promise((resolve, reject) => {
         const csvWriter = fs.createWriteStream('./attendees.csv');
         csvWriter.write(csvStream.data);
-        csvWriter.end();
-        console.log("Wrote stream to attendees.csv");
-        resolve();
+        csvWriter.on('error', (err) => {
+            console.log("Error creating write stream");
+            reject(err);
+        }).on('finish', () => {
+            console.log("3/7 : Wrote stream to attendees.csv");
+            resolve();
+        });
+        csvWriter.end();               
     });
 }
 
@@ -62,19 +79,96 @@ function readCSVFile() {
         readCSVStream.on('data', (data) => {
             registrantRawArray.push(data);
         }).on('end', () => {
-            console.log(registrantRawArray.length);
+            console.log("4/7 : Data loaded from attendees.csv");
             resolve(registrantRawArray);
-        });
+        }).on('error', (err) => {
+            console.log("Error creating read stream");
+            reject(err);
+        })
     });
 }
 
+function parseRegistrantArray(regArray) {
+    return new Promise((resolve, reject) => {
+        let registrantList = {
+            updates : []
+        };    
+        regArray.forEach((row, i) => {
+            let hasData = false;
+            let person = {};
+            for(let prop in regArray[i]){
+                if(regArray[i].hasOwnProperty(prop)) {
+                    if(settings.validar.fieldsToPull.indexOf(prop) > -1) {
+                        person[prop] = regArray[i][prop];
+                        hasData = true;
+                    }
+                }
+            }
+            if(hasData) {
+                registrantList.updates.push(person);
+            }
+        });
+        console.log(`5/7 : Removed unnecessary fields from ${registrantList.updates.length} attendees`);
+        resolve(registrantList);
+    });
+}
+
+function stringAndChunkArray(regArray) {   
+    return new Promise((resolve, reject) => {
+        let updatesArray = [];
+        for(let i = 0, j = regArray.updates.length; i < j; i += settings.validar.maxNumberToPush) {
+            let tempArray = regArray.updates.slice(i, i + settings.validar.maxNumberToPush);
+            let xmlUpdates = convertArrToXMLStr(tempArray);
+            updatesArray.push(xmlUpdates);
+        }
+        if(regArray.updates.length > 0) {
+            console.log(`6/7 : Updates XML has been split into ${updatesArray.length}`);
+            resolve(updatesArray);
+        } else {
+            console.log("No updates to post");
+            reject();
+        }
+    });    
+}
+
+function pushToValidar(updatesArr) {
+    if(updatesArr.length > 0) {
+        axios.post(settings.validar.soapURL, updatesArr[0], validarAxiosHeader)
+            .then((response) => {
+                updatesArr.shift();
+                if(updatesArr.length > 0) {
+                    pushToValidar(updatesArr);
+                } else {
+                    firstPull = false;
+                    console.log("7/7 : Finished posting everything to Validar");
+                }
+            }).catch((err) => {
+                console.log("Error posting to Validar");
+            });
+    }
+}
+
+// Helper function to convert JSON to string
+function convertArrToXMLStr(arr) {
+    let regList = {};
+    regList.updates = arr;
+    let xmlFromJS = js2xmlparser.parse("reg", regList, js2xmlOptions);
+    let xmlStr = xmlFromJS.substring(5, xmlFromJS.length-6);
+    return xmlStr;
+}
+
 function startApplication() {
+    console.log("Starting application...");
     makeSociousRequest()
         .then(writeCSVtoFile)
         .then(readCSVFile)
+        .then(parseRegistrantArray)
+        .then(stringAndChunkArray)
+        .then(pushToValidar)
         .catch((err) => {
             console.log(err);
         });
 }
 
-startApplication();
+// Start the application
+setInterval(startApplication, settings.validar.timeBetweenPulls);
