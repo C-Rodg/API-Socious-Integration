@@ -12,9 +12,6 @@ const soap = require('./soapRequest');
 const js2xmlOptions = {
     declaration : {
         include : false
-    },
-    arrayMap : {
-        updates : "update"
     }
 };
 
@@ -35,7 +32,7 @@ function getSociousURL() {
     const signatureBytes = CryptoJS.HmacSHA256(signatureSecret, settings.socious.apiSecret);
     const signatureText = signatureBytes.toString();
 
-    const url = `${settings.socious.baseURL}?action=${settings.socious.action}&eventid=${settings.socious.eventId}&timestamp=${timestamp}&apikey=${settings.socious.apiKey}&signature=${signatureText}`;
+    let url = `${settings.socious.baseURL}?action=${settings.socious.action}&eventid=${settings.socious.eventId}&timestamp=${timestamp}&apikey=${settings.socious.apiKey}&signature=${signatureText}`;
     if(!firstPull){
         url += '&updates=1';
     }
@@ -133,7 +130,9 @@ function stringAndChunkArray(regArray) {
 
 function pushToValidar(updatesArr) {
     if(updatesArr.length > 0) {
-        axios.post(settings.validar.soapURL, updatesArr[0], validarAxiosHeader)
+        let soapData = soap.getSoapRequest(settings.validar.username, settings.validar.password, settings.validar.eventGuid, updatesArr[0]);
+        //fs.writeFile('test.xml', soapData, ()=>{});
+        return axios.post(settings.validar.soapURL, soapData, validarAxiosHeader)
             .then((response) => {
                 updatesArr.shift();
                 if(updatesArr.length > 0) {
@@ -151,14 +150,14 @@ function pushToValidar(updatesArr) {
 // Helper function to convert JSON to string
 function convertArrToXMLStr(arr) {
     let regList = {};
-    regList.updates = arr;
+    regList.update = arr;
     let xmlFromJS = js2xmlparser.parse("reg", regList, js2xmlOptions);
     let xmlStr = xmlFromJS.substring(5, xmlFromJS.length-6);
     return xmlStr;
 }
 
 function startApplication() {
-    console.log("Starting application...");
+    console.log("Starting data pull...");
     makeSociousRequest()
         .then(writeCSVtoFile)
         .then(readCSVFile)
@@ -171,4 +170,5 @@ function startApplication() {
 }
 
 // Start the application
-setInterval(startApplication, settings.validar.timeBetweenPulls);
+console.log("Starting application...");
+setInterval(startApplication, settings.validar.timeBetweenPulls);  // 60000

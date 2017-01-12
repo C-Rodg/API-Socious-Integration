@@ -6,7 +6,9 @@ function getSoapRequest(user, pass, guid, updates) {
              </AuthenticationSoapHeader></soap:Header>
              <soap:Body><PutRegistrationData xmlns="https://portal.validar.com/">
              <eventGuid>${guid}</eventGuid><data><![CDATA[
-                 ${updates}
+                 <updates>
+                    ${updates}
+                 </updates>
             ]]></data></PutRegistrationData></soap:Body></soap:Envelope>   
     `;
 }
